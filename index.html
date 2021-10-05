@@ -1,0 +1,22 @@
+<html>
+<head>
+<title>Chevalchemy: A Hoof of Concept</title>
+</head>
+<body>
+    <script>
+     resize_canvas = (width, height) => {
+         let canvas = document.getElementsByTagName("canvas")[0];
+         if (canvas != null) {
+             canvas.width = width * window.devicePixelRatio;
+             canvas.height = height * window.devicePixelRatio;
+             canvas.style = `width: ${width}; height: ${height}`;
+         }
+     }
+    </script>
+    <script type="module">
+     import init from "./ldjam49.js";
+     const wasm = await init("./ldjam49_bg.wasm");
+     wasm.run();
+    </script>
+</body>
+</html>
