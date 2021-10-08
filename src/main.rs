@@ -1,3 +1,3 @@
 fn main() {
-    ldjam49::run();
+    chevalchemy::run();
 }

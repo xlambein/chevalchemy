@@ -1,59 +1,25 @@
-use bevy::app::AppExit;
-use bevy::ecs::system::EntityCommands;
-use bevy::prelude::*;
-use bevy::sprite;
-use bevy::window::WindowResized;
+use bevy::{app::AppExit, prelude::*};
 use bevy_rapier2d::{na, prelude::*};
 use rand::prelude::*;
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
-extern "C" {
-    fn resize_canvas(width: f32, height: f32);
-}
-
+mod handles;
+mod items;
+mod levels;
 #[cfg(target_arch = "wasm32")]
-pub fn resizer(
-    window_descriptor: Res<WindowDescriptor>,
-    mut windows: ResMut<Windows>,
-    mut window_resized_events: EventWriter<WindowResized>,
-) {
-    if let Some(window) = windows.get_primary_mut() {
-        let WindowDescriptor { width, height, .. } = *window_descriptor;
-        if window.width() != width || window.height() != height {
-            info!(
-                "Current window size: {:?},{:?} with scale {:?}",
-                window.width(),
-                window.height(),
-                window.scale_factor()
-            );
-            info!("Resizing to {:?},{:?}", width, height);
-            let p_width = width * window.scale_factor() as f32;
-            let p_height = height * window.scale_factor() as f32;
-            window.update_actual_size_from_backend(p_width as u32, p_height as u32);
-            window_resized_events.send(WindowResized {
-                id: window.id(),
-                height: height,
-                width: width,
-            });
-            resize_canvas(width, height);
-        }
-    }
-}
+mod wasm;
+
+use handles::Handles;
+use items::*;
+use levels::*;
 
 #[wasm_bindgen]
 pub fn run() {
-    #[cfg(target_arch = "wasm32")]
-    console_error_panic_hook::set_once();
-
     let mut app = App::build();
     app.add_plugins(DefaultPlugins);
 
     #[cfg(target_arch = "wasm32")]
-    app.add_plugin(bevy_webgl2::WebGL2Plugin)
-        // "resizer" hack to ensure the canvas size is correct,
-        // ruthlessly stolen from https://github.com/horup/some-tank-game-rs
-        .add_system(resizer.system());
+    app.add_plugin(wasm::WasmPlugin);
 
     app.insert_resource(WindowDescriptor {
         title: "Chevalchemy: a Hoof of Concept".to_string(),
@@ -109,88 +75,6 @@ pub fn run() {
     //         .with_system(rules.system()),
     // )
     .run();
-}
-
-struct Handles {
-    bg_texture: Handle<Texture>,
-    bg_material: Handle<ColorMaterial>,
-    leg_texture: Handle<Texture>,
-    leg_material: Handle<ColorMaterial>,
-    cauldron_texture: Handle<Texture>,
-    cauldron_material: Handle<ColorMaterial>,
-    controls_texture: Handle<Texture>,
-    controls_atlas: Handle<TextureAtlas>,
-    items_texture: Handle<Texture>,
-    items_atlas: Handle<TextureAtlas>,
-    smoke_texture: Handle<Texture>,
-    smoke_atlas: Handle<TextureAtlas>,
-}
-
-impl FromWorld for Handles {
-    fn from_world(world: &mut bevy::prelude::World) -> Self {
-        let asset_server = world.get_resource::<AssetServer>().unwrap();
-        let mut texture_atlases = unsafe {
-            world
-                .get_resource_unchecked_mut::<Assets<TextureAtlas>>()
-                .unwrap()
-        };
-        let mut color_materials = unsafe {
-            world
-                .get_resource_unchecked_mut::<Assets<ColorMaterial>>()
-                .unwrap()
-        };
-
-        let bg = asset_server.load("main.png");
-
-        let leg: Handle<Texture> = asset_server.load("leg.png");
-
-        let controls = asset_server.load("controls.png");
-        let mut controls_atlas = TextureAtlas::new_empty(controls.clone(), Vec2::new(180.0, 63.0));
-        for [min, max] in CONTROLS_ATLAS_TEXTURES {
-            controls_atlas.add_texture(sprite::Rect {
-                min: Vec2::new(min[0] as f32, min[1] as f32),
-                max: Vec2::new(max[0] as f32, max[1] as f32),
-            });
-        }
-        let controls_atlas = texture_atlases.add(controls_atlas);
-
-        let items = asset_server.load("items.png");
-        let mut atlas = TextureAtlas::new_empty(items.clone(), Vec2::new(400.0, 300.0));
-        for [min, max] in ITEMS_ATLAS_TEXTURES {
-            atlas.add_texture(sprite::Rect {
-                min: Vec2::new(min[0] as f32, min[1] as f32),
-                max: Vec2::new(max[0] as f32, max[1] as f32),
-            });
-        }
-        let items_atlas = texture_atlases.add(atlas);
-
-        let smoke = asset_server.load("smoke.png");
-        let mut smoke_atlas = TextureAtlas::new_empty(smoke.clone(), Vec2::new(155.0, 144.0));
-        for [min, max] in SMOKE_ATLAS_TEXTURES {
-            smoke_atlas.add_texture(sprite::Rect {
-                min: Vec2::new(min[0] as f32, min[1] as f32),
-                max: Vec2::new(max[0] as f32, max[1] as f32),
-            });
-        }
-        let smoke_atlas = texture_atlases.add(smoke_atlas);
-
-        let cauldron_texture = asset_server.load("cauldron.png");
-
-        Handles {
-            bg_texture: bg.clone(),
-            bg_material: color_materials.add(bg.into()),
-            leg_texture: leg.clone(),
-            leg_material: color_materials.add(leg.into()),
-            cauldron_texture: cauldron_texture.clone(),
-            cauldron_material: color_materials.add(cauldron_texture.into()),
-            controls_texture: controls,
-            controls_atlas: controls_atlas,
-            items_texture: items,
-            items_atlas: items_atlas,
-            smoke_texture: smoke,
-            smoke_atlas: smoke_atlas,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -300,87 +184,6 @@ enum ItemType {
     Gold = 20,
 }
 
-const CONTROLS_ATLAS_TEXTURES: &[[[i32; 2]; 2]] = &[
-    // 0. Exit
-    [[4, 4], [4 + 56, 4 + 52]],
-    // 1. Restart
-    [[62, 5], [62 + 56, 5 + 52]],
-    // 2. Checkmark
-    [[119, 4], [119 + 60, 4 + 56]],
-];
-
-const ITEMS_ATLAS_TEXTURES: &[[[i32; 2]; 2]] = &[
-    // 0. Eyed vial
-    [[270, 137], [313, 189]],
-    // 1. Support 1
-    [[250, 175], [269, 195]],
-    // 2. Support 2
-    [[250, 197], [270, 219]],
-    // 3. Radioactive vial
-    [[22, 130], [54, 186]],
-    // 4. Bone 1
-    [[230, 100], [308, 125]],
-    // 5. Bone 2 (left]
-    [[222, 76], [266, 96]],
-    // 6. Bone 3 (right]
-    [[273, 74], [321, 98]],
-    // 7. Mug
-    [[331, 68], [377, 116]],
-    // 8. Yorick
-    [[14, 78], [69, 127]],
-    // 9. Vial stand (back)
-    [[63, 136], [140, 189]],
-    // 10. Vial stand (front)
-    [[63, 136 + 54], [140, 189 + 54]],
-    // 11. Red vial
-    [[141, 125], [160, 180]],
-    // 12. Yellow vial
-    [[160, 126], [180, 180]],
-    // 13. Blue vial
-    [[181, 124], [200, 181]],
-    // 14--19. Cubes
-    [[338, 133], [338 + 24, 133 + 24]],
-    [[323, 163], [323 + 24, 163 + 24]],
-    [[354, 163], [354 + 24, 163 + 24]],
-    [[310, 194], [310 + 25, 194 + 26]],
-    [[339, 193], [339 + 25, 193 + 26]],
-    [[367, 191], [367 + 24, 191 + 29]],
-    // 20--25. Gold nuggets
-    [[142, 4], [142 + 22, 4 + 23]],
-    [[167, 3], [167 + 22, 3 + 23]],
-    [[141, 32], [141 + 23, 32 + 22]],
-    [[166, 32], [166 + 22, 32 + 22]],
-    [[142, 56], [142 + 22, 56 + 21]],
-    [[165, 55], [165 + 22, 55 + 22]],
-    // //
-    // [[], []],
-    // //
-    // [[], []],
-    // //
-    // [[], []],
-    // //
-    // [[], []],
-    // //
-    // [[], []],
-    // //
-    // [[], []],
-    // //
-    // [[], []],
-    // //
-    // [[], []],
-    // //
-    // [[], []],
-    // //
-    // [[], []],
-];
-
-const SMOKE_ATLAS_TEXTURES: &[[[i32; 2]; 2]] = &[
-    [[75, 114], [75 + 28, 114 + 26]],
-    [[31, 105], [31 + 35, 105 + 27]],
-    [[109, 89], [109 + 27, 89 + 28]],
-    [[63, 70], [63 + 42, 70 + 36]],
-];
-
 fn spawn_cuboid(commands: &mut Commands, pos: Vec2, size: Vec2) {
     commands
         .spawn_bundle(RigidBodyBundle {
@@ -410,38 +213,6 @@ fn spawn_cupboard(commands: &mut Commands) {
     spawn_cuboid(commands, Vec2::new(250., -75.), board_size);
 }
 
-fn spawn_from_atlas<'a, 'b>(
-    commands: &'b mut Commands<'a>,
-    atlas: Handle<TextureAtlas>,
-    index: u32,
-    item_type: ItemType,
-    position: Vec2,
-    shape: ColliderShape,
-) -> EntityCommands<'a, 'b> {
-    let mut entity = commands.spawn_bundle(SpriteSheetBundle {
-        sprite: TextureAtlasSprite::new(index),
-        texture_atlas: atlas.clone(),
-        transform: Transform::from_xyz(0., 0., 5.) * Transform::from_scale(Vec3::splat(2.0)),
-        ..Default::default()
-    });
-    entity
-        .insert_bundle(RigidBodyBundle {
-            position: position.into(),
-            ccd: RigidBodyCcd {
-                ccd_enabled: true,
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .insert_bundle(ColliderBundle {
-            shape,
-            ..Default::default()
-        })
-        .insert(RigidBodyPositionSync::Discrete)
-        .insert(Item(item_type));
-    entity
-}
-
 fn make_convex_hull(shape: &[[f32; 2]]) -> ColliderShape {
     ColliderShape::convex_hull(&shape.iter().cloned().map(Into::into).collect::<Vec<_>>()).unwrap()
 }
@@ -453,330 +224,6 @@ fn make_compound_shape(shapes: &[Vec<[f32; 2]>]) -> ColliderShape {
             .map(|shape| ([0., 0.].into(), make_convex_hull(shape)))
             .collect(),
     )
-}
-
-fn eyed_vial(commands: &mut Commands, atlas: Handle<TextureAtlas>, position: Vec2) {
-    // Vial
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        0,
-        ItemType::EyedVial,
-        position,
-        ColliderShape::compound(vec![
-            ([0., -8.].into(), ColliderShape::ball(36.)),
-            ([0., 36.].into(), ColliderShape::cuboid(10.0, 15.0)),
-        ]),
-    );
-
-    // Support 1
-    let shape = vec![[-5.0, 12.0], [-12.0, -14.0], [13.0, -10.0]];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        1,
-        ItemType::Support,
-        position + Vec2::new(-36., -40.),
-        make_convex_hull(&shape),
-    );
-
-    // Support 2
-    let shape = vec![[1.0, 12.0], [-13.0, -13.0], [13.0, -14.0]];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        2,
-        ItemType::Support,
-        position + Vec2::new(36., -40.),
-        make_convex_hull(&shape),
-    );
-}
-
-fn radioactive_vial(commands: &mut Commands, atlas: Handle<TextureAtlas>, position: Vec2) {
-    let shapes = vec![
-        vec![[-23.0, -49.0], [-11.0, 4.0], [10.0, 6.0], [25.0, -46.0]],
-        vec![[-11.0, 4.0], [-13.0, 41.0], [12.0, 48.0], [10.0, 6.0]],
-    ];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        3,
-        ItemType::RadioactiveVial,
-        position,
-        make_compound_shape(&shapes),
-    );
-}
-
-fn bone1(commands: &mut Commands, atlas: Handle<TextureAtlas>, position: Vec2) {
-    let shapes = vec![
-        vec![[-39.0, 3.0], [-54.0, 7.0], [-67.0, -16.0], [-39.0, -14.0]],
-        vec![[-39.0, 3.0], [-39.0, -14.0], [49.0, -13.0], [40.0, 6.0]],
-        vec![[49.0, -13.0], [67.0, -16.0], [65.0, 15.0], [40.0, 6.0]],
-    ];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        4,
-        ItemType::Bone,
-        position,
-        make_compound_shape(&shapes),
-    );
-}
-
-fn bone2(commands: &mut Commands, atlas: Handle<TextureAtlas>, position: Vec2) {
-    let shapes = vec![
-        vec![[-34.0, 11.0], [-35.0, -12.0], [-14.0, -8.0], [-19.0, 8.0]],
-        vec![[-14.0, -8.0], [31.0, -5.0], [30.0, 7.0], [-19.0, 8.0]],
-    ];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        5,
-        ItemType::Bone,
-        position + Vec2::new(-20., 0.),
-        make_compound_shape(&shapes),
-    );
-
-    let shapes = vec![
-        vec![[-32.0, 8.0], [-34.0, -5.0], [8.0, -3.0], [29.0, 7.0]],
-        vec![[8.0, -3.0], [37.0, -15.0], [40.0, 11.0], [29.0, 7.0]],
-    ];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        6,
-        ItemType::Bone,
-        position + Vec2::new(20., 0.),
-        make_compound_shape(&shapes),
-    );
-}
-
-fn mug(commands: &mut Commands, atlas: Handle<TextureAtlas>, position: Vec2) {
-    let shapes = vec![
-        vec![[38.0, 35.0], [-13.0, 35.0], [-21.0, -33.0], [31.0, -37.0]],
-        vec![
-            [-17.0, 21.0],
-            [-29.0, 22.0],
-            [-38.0, 8.0],
-            [-38.0, -15.0],
-            [-30.0, -25.0],
-            [-20.0, -26.0],
-        ],
-    ];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        7,
-        ItemType::Mug,
-        position,
-        make_compound_shape(&shapes),
-    );
-}
-
-fn yorick(commands: &mut Commands, atlas: Handle<TextureAtlas>, position: Vec2) {
-    let jaw = vec![
-        [-31.0, -6.0],
-        [-48.0, -26.0],
-        [-25.0, -43.0],
-        [-8.0, -42.0],
-        [-0.0, -32.0],
-    ];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        8,
-        ItemType::Yorick,
-        position,
-        ColliderShape::compound(vec![
-            ([7., -1.].into(), ColliderShape::ball(33.)),
-            ([0., 0.].into(), make_convex_hull(&jaw)),
-        ]),
-    );
-}
-
-fn vial_stand(commands: &mut Commands, atlas: Handle<TextureAtlas>, position: Vec2) {
-    let shapes = vec![
-        // Bottom
-        vec![[66.0, -22.0], [66.0, -44.0], [-59.0, -42.0], [-66.0, -25.0]],
-        // Top left
-        vec![[-68.0, 20.0], [-68.0, 34.0], [-55.0, 40.0], [-52.0, 21.0]],
-        // Top center-left
-        vec![[-11.0, 22.0], [-21.0, 21.0], [-20.0, 40.0], [-13.0, 40.0]],
-        // Top center-right
-        vec![[17.0, 25.0], [29.0, 24.0], [28.0, 40.0], [19.0, 41.0]],
-        // Top right
-        vec![[54.0, 21.0], [53.0, 41.0], [68.0, 41.0], [69.0, 20.0]],
-    ];
-    let mut entity = spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        9,
-        ItemType::VialStand,
-        position,
-        make_compound_shape(&shapes),
-    );
-    // Front
-    entity.with_children(|parent| {
-        parent.spawn_bundle(SpriteSheetBundle {
-            sprite: TextureAtlasSprite::new(10),
-            texture_atlas: atlas.clone(),
-            transform: Transform::from_xyz(0., 0., 10.),
-            ..Default::default()
-        });
-    });
-
-    // Red vial
-    let shape = vec![[-10.0, 39.0], [-8.0, -44.0], [9.0, -41.0], [10.0, 43.0]];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        11,
-        ItemType::RedVial,
-        position + Vec2::new(-36., 15.),
-        make_convex_hull(&shape),
-    );
-    // Yellow vial
-    let shape = vec![
-        [-10.0, 40.0],
-        [-6.0, -42.0],
-        [4.0, -47.0],
-        [11.0, -37.0],
-        [11.0, 46.0],
-    ];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        12,
-        ItemType::YellowVial,
-        position + Vec2::new(-2., 15.),
-        make_convex_hull(&shape),
-    );
-    // Blue vial
-    let shape = vec![
-        [-12.0, 45.0],
-        [-11.0, -44.0],
-        [-6.0, -50.0],
-        [4.0, -49.0],
-        [10.0, -36.0],
-        [8.0, 48.0],
-    ];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        13,
-        ItemType::BlueVial,
-        position + Vec2::new(39., 15.),
-        make_convex_hull(&shape),
-    );
-}
-
-fn cubes(commands: &mut Commands, atlas: Handle<TextureAtlas>, position: Vec2) {
-    let shape = vec![[-12.0, 12.0], [-13.0, -15.0], [14.0, -12.0], [8.0, 15.0]];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        14 + 0,
-        ItemType::Cube,
-        position + Vec2::new(0., 64.),
-        make_convex_hull(&shape),
-    );
-    let shape = vec![[-13.0, 9.0], [9.0, 16.0], [12.0, -13.0], [-10.0, -16.0]];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        14 + 1,
-        ItemType::Cube,
-        position + Vec2::new(-16., 32.),
-        make_convex_hull(&shape),
-    );
-    let shape = vec![[12.0, 16.0], [-13.0, 13.0], [-11.0, -14.0], [12.0, -13.0]];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        14 + 2,
-        ItemType::Cube,
-        position + Vec2::new(16., 32.),
-        make_convex_hull(&shape),
-    );
-    let shape = vec![[-16.0, 9.0], [12.0, 18.0], [16.0, -15.0], [-9.0, -19.0]];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        14 + 3,
-        ItemType::Cube,
-        position + Vec2::new(-32., 0.),
-        make_convex_hull(&shape),
-    );
-    let shape = vec![[-13.0, 13.0], [15.0, 18.0], [15.0, -19.0], [-12.0, -16.0]];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        14 + 4,
-        ItemType::Cube,
-        position + Vec2::new(0., 0.),
-        make_convex_hull(&shape),
-    );
-    let shape = vec![[14.0, 18.0], [-14.0, 17.0], [-11.0, -22.0], [14.0, -21.0]];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        14 + 5,
-        ItemType::Cube,
-        position + Vec2::new(32., 0.),
-        make_convex_hull(&shape),
-    );
-}
-
-fn golden_nuggets(commands: &mut Commands, atlas: Handle<TextureAtlas>, position: Vec2) {
-    let shape = ColliderShape::round_cuboid(10., 10., 4.);
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        20 + 0,
-        ItemType::Gold,
-        position + Vec2::new(0., 64.),
-        shape.clone(),
-    );
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        20 + 1,
-        ItemType::Gold,
-        position + Vec2::new(-15., 32.),
-        shape.clone(),
-    );
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        20 + 2,
-        ItemType::Gold,
-        position + Vec2::new(15., 32.),
-        shape.clone(),
-    );
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        20 + 3,
-        ItemType::Gold,
-        position + Vec2::new(-30., 0.),
-        shape.clone(),
-    );
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        20 + 4,
-        ItemType::Gold,
-        position + Vec2::new(0., 0.),
-        shape.clone(),
-    );
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        20 + 5,
-        ItemType::Gold,
-        position + Vec2::new(30., 0.),
-        shape.clone(),
-    );
 }
 
 fn cauldron(commands: &mut Commands, handles: &Res<Handles>) {
@@ -842,7 +289,7 @@ fn smoke(commands: &mut Commands, handles: &Res<Handles>, color: Color) {
     let mut rng = rand::thread_rng();
 
     for _ in 0..10 {
-        let index = rng.gen_range(0..SMOKE_ATLAS_TEXTURES.len() as u32);
+        let index = rng.gen_range(0..4);
         let pos = Vec2::new(rng.gen_range(-100.0..100.0), rng.gen_range(-125.0..-75.0));
         let speed = Vec2::new(rng.gen_range(-100.0..100.0), rng.gen_range(50.0..100.0));
 
@@ -875,13 +322,7 @@ fn smoke(commands: &mut Commands, handles: &Res<Handles>, color: Color) {
     }
 }
 
-fn setup(
-    mut commands: Commands,
-    mut reset_level_events: EventWriter<ResetLevelEvent>,
-
-    mut windows: ResMut<Windows>,
-    mut window_resized_events: EventWriter<WindowResized>,
-) {
+fn setup(mut commands: Commands, mut reset_level_events: EventWriter<ResetLevelEvent>) {
     commands.insert_resource(RapierConfiguration {
         gravity: Vec2::new(0., -98.1 * 2.).into(),
         scale: 1.0,
@@ -889,28 +330,6 @@ fn setup(
     });
 
     reset_level_events.send(ResetLevelEvent);
-
-    // #[cfg(target_arch = "wasm32")]
-    // if let Some(window) = windows.get_primary_mut() {
-    //     if window.width() != width || window.height() != height {
-    //         info!(
-    //             "Current window size: {:?},{:?}",
-    //             window.width(),
-    //             window.height()
-    //         );
-    //         let width: f32 = 800.;
-    //         let height: f32 = 600.;
-    //         info!("Resizing to {:?},{:?}", width, height);
-    //         window.update_actual_size_from_backend(width as u32, height as u32);
-    //         window_resized_events.send(WindowResized {
-    //             id: window.id(),
-    //             height: height,
-    //             width: width,
-    //         });
-    //         resize_canvas(width, height);
-    //         info!("Resized");
-    //     }
-    // }
 }
 
 fn setup_base(mut commands: Commands, handles: Res<Handles>) {
@@ -988,136 +407,7 @@ fn setup_base(mut commands: Commands, handles: Res<Handles>) {
         });
 }
 
-fn spawn_level0(commands: &mut Commands, handles: &Res<Handles>) {
-    bone1(commands, handles.items_atlas.clone(), Vec2::new(192., 89.));
-    bone2(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(192., 89. + 40.),
-    );
-    cubes(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-300., -50.),
-    );
-    eyed_vial(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-190., 236.),
-    );
-    yorick(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-320., 230.),
-    );
-}
-
-fn spawn_level1(commands: &mut Commands, handles: &Res<Handles>) {
-    eyed_vial(commands, handles.items_atlas.clone(), Vec2::new(180., -20.));
-    bone1(commands, handles.items_atlas.clone(), Vec2::new(200., 200.));
-    bone2(commands, handles.items_atlas.clone(), Vec2::new(200., 250.));
-    mug(commands, handles.items_atlas.clone(), Vec2::new(310., 104.));
-    cubes(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-200., -53.),
-    );
-    yorick(commands, handles.items_atlas.clone(), Vec2::new(-200., 93.));
-    golden_nuggets(commands, handles.items_atlas.clone(), Vec2::new(-318., 70.));
-}
-
-fn spawn_level2(commands: &mut Commands, handles: &Res<Handles>) {
-    eyed_vial(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-189., 110.),
-    );
-    radioactive_vial(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-300., -10.),
-    );
-    bone1(commands, handles.items_atlas.clone(), Vec2::new(200., 200.));
-    bone2(commands, handles.items_atlas.clone(), Vec2::new(200., 250.));
-    mug(commands, handles.items_atlas.clone(), Vec2::new(310., 104.));
-    cubes(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-200., -53.),
-    );
-    yorick(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-270., 225.),
-    );
-    golden_nuggets(commands, handles.items_atlas.clone(), Vec2::new(186., 70.));
-}
-
-fn spawn_level3(commands: &mut Commands, handles: &Res<Handles>) {
-    eyed_vial(commands, handles.items_atlas.clone(), Vec2::new(200., -20.));
-    radioactive_vial(commands, handles.items_atlas.clone(), Vec2::new(-200., 0.));
-    bone1(commands, handles.items_atlas.clone(), Vec2::new(200., 200.));
-    bone2(commands, handles.items_atlas.clone(), Vec2::new(200., 250.));
-    mug(commands, handles.items_atlas.clone(), Vec2::new(320., 240.));
-    yorick(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-310., 110.),
-    );
-    vial_stand(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-200., 120.),
-    );
-    cubes(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-300., -43.),
-    );
-    golden_nuggets(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-200., 200.),
-    );
-}
-
-fn spawn_level4(commands: &mut Commands, handles: &Res<Handles>) {
-    eyed_vial(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-319., 238.),
-    );
-    radioactive_vial(commands, handles.items_atlas.clone(), Vec2::new(327., -16.));
-    mug(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-307., 100.),
-    );
-    yorick(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-312., -26.),
-    );
-    vial_stand(commands, handles.items_atlas.clone(), Vec2::new(200., 110.));
-    golden_nuggets(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-200., -44.),
-    );
-    bone1(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-200., 200.),
-    );
-    bone2(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-200., 250.),
-    );
-    cubes(commands, handles.items_atlas.clone(), Vec2::new(223., 210.));
-}
-
-fn start_level(commands: &mut Commands, handles: &Res<Handles>, items: &Query<Entity, With<Item>>) {
+fn start_level(commands: &mut Commands, handles: &Res<Handles>) {
     // Probe
     commands
         .spawn_bundle(SpriteBundle::default())
@@ -1163,12 +453,6 @@ fn start_level(commands: &mut Commands, handles: &Res<Handles>, items: &Query<En
             //     .insert(ColliderDebugRender::with_id(0))
             //     .insert(ColliderPositionSync::Discrete);
         });
-}
-
-fn enable_ccd_everywhere(mut ccds: Query<&mut RigidBodyCcd>) {
-    for mut rb_ccd in ccds.iter_mut() {
-        rb_ccd.ccd_enabled = true;
-    }
 }
 
 fn mouse_position(
