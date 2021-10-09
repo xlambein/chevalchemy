@@ -202,15 +202,15 @@ fn spawn_cuboid(commands: &mut Commands, pos: Vec2, size: Vec2) {
 }
 
 fn spawn_cupboard(commands: &mut Commands) {
-    let board_size = Vec2::new(250., 10.);
+    let board_size = Vec2::new(125., 5.);
 
-    spawn_cuboid(commands, Vec2::new(-250., 175.), board_size);
-    spawn_cuboid(commands, Vec2::new(-250., 50.), board_size);
-    spawn_cuboid(commands, Vec2::new(-250., -75.), board_size);
+    spawn_cuboid(commands, Vec2::new(-125., 87.), board_size);
+    spawn_cuboid(commands, Vec2::new(-125., 25.), board_size);
+    spawn_cuboid(commands, Vec2::new(-125., -37.), board_size);
 
-    spawn_cuboid(commands, Vec2::new(250., 175.), board_size);
-    spawn_cuboid(commands, Vec2::new(250., 50.), board_size);
-    spawn_cuboid(commands, Vec2::new(250., -75.), board_size);
+    spawn_cuboid(commands, Vec2::new(125., 87.), board_size);
+    spawn_cuboid(commands, Vec2::new(125., 25.), board_size);
+    spawn_cuboid(commands, Vec2::new(125., -37.), board_size);
 }
 
 fn make_convex_hull(shape: &[[f32; 2]]) -> ColliderShape {
@@ -228,45 +228,40 @@ fn make_compound_shape(shapes: &[Vec<[f32; 2]>]) -> ColliderShape {
 
 fn cauldron(commands: &mut Commands, handles: &Res<Handles>) {
     let shapes = vec![
-        vec![[-107.0, 80.0], [-99.0, 76.0], [-117.0, 0.0], [-121.0, 16.0]],
-        vec![
-            [-121.0, 15.0],
-            [-84.0, -30.0],
-            [-109.0, -19.0],
-            [-120.0, -2.0],
-        ],
-        vec![[-92.0, -25.0], [97.0, -25.0], [52.0, -37.0], [-44.0, -36.0]],
-        vec![[97.0, -28.0], [111.0, -18.0], [124.0, 6.0], [121.0, 32.0]],
-        vec![[122.0, 24.0], [104.0, 80.0], [102.0, 70.0], [120.0, 6.0]],
+        vec![[-53.5, 40.0], [-49.5, 38.0], [-58.5, 0.0], [-60.5, 8.0]],
+        vec![[-60.5, 7.5], [-42.0, -15.0], [-54.5, -9.5], [-60.0, -1.0]],
+        vec![[-46.0, -12.5], [48.5, -12.5], [26.0, -18.5], [-22.0, -18.0]],
+        vec![[48.5, -14.0], [55.5, -9.0], [62.0, 3.0], [60.5, 16.0]],
+        vec![[61.0, 12.0], [52.0, 40.0], [51.0, 35.0], [60.0, 3.0]],
     ];
     let sensor = vec![
-        // [-109.0, -169.0],
-        // [119.0, -167.0],
-        // [93.0, -201.0],
-        // [-88.0, -199.0],
-        [-111.0, 9.0],
-        [117.0, 11.0],
-        [91.0, -23.0],
-        [-90.0, -21.0],
+        // [-54.5, -84.5],
+        // [59.5, -83.5],
+        // [46.5, -100.5],
+        // [-44.0, -99.5],
+        [-55.5, 4.5],
+        [58.5, 5.5],
+        [45.5, -11.5],
+        [-45.0, -10.5],
     ];
 
     // for shape in &shapes {
     //     eprintln!("vec![");
     // for [x, y] in &sensor {
-    //     eprintln!("[{:.0}.0, {:.0}.0],", x - 2., y + 300. - 122.);
+    //     eprintln!("[{:.0}.0, {:.0}.0],", x - 1., y + 150. - 61.);
     // }
     //     eprintln!("],");
     // }
 
     commands
         .spawn_bundle(SpriteBundle {
-            transform: Transform::from_xyz(0., 0., 100.) * Transform::from_scale(Vec3::splat(2.)),
+            transform: Transform::from_xyz(0., 0., 100.),
             material: handles.cauldron_material.clone(),
             ..Default::default()
         })
         .insert_bundle(RigidBodyBundle {
             body_type: RigidBodyType::Static,
-            position: [2., -300. + 122.].into(),
+            position: [1., -150. + 61.].into(),
             ..Default::default()
         })
         .insert_bundle(ColliderBundle {
@@ -290,8 +285,8 @@ fn smoke(commands: &mut Commands, handles: &Res<Handles>, color: Color) {
 
     for _ in 0..10 {
         let index = rng.gen_range(0..4);
-        let pos = Vec2::new(rng.gen_range(-100.0..100.0), rng.gen_range(-125.0..-75.0));
-        let speed = Vec2::new(rng.gen_range(-100.0..100.0), rng.gen_range(50.0..100.0));
+        let pos = Vec2::new(rng.gen_range(-50.0..50.0), rng.gen_range(-62.5..-37.5));
+        let speed = Vec2::new(rng.gen_range(-50.0..50.0), rng.gen_range(25.0..50.0));
 
         commands
             .spawn_bundle(SpriteSheetBundle {
@@ -301,8 +296,7 @@ fn smoke(commands: &mut Commands, handles: &Res<Handles>, color: Color) {
                     ..TextureAtlasSprite::default()
                 },
                 texture_atlas: handles.smoke_atlas.clone(),
-                transform: Transform::from_xyz(0., 0., 5.)
-                    * Transform::from_scale(Vec3::splat(2.0)),
+                transform: Transform::from_xyz(0., 0., 5.),
                 ..Default::default()
             })
             .insert_bundle(RigidBodyBundle {
@@ -311,7 +305,7 @@ fn smoke(commands: &mut Commands, handles: &Res<Handles>, color: Color) {
                     linvel: speed.into(),
                     ..Default::default()
                 },
-                mass_properties: MassProperties::from_ball(1.0, 20.0).into(),
+                mass_properties: MassProperties::from_ball(1.0, 10.0).into(),
                 forces: RigidBodyForces {
                     gravity_scale: -1.,
                     ..Default::default()
@@ -334,14 +328,18 @@ fn setup(mut commands: Commands, mut reset_level_events: EventWriter<ResetLevelE
 
 fn setup_base(mut commands: Commands, handles: Res<Handles>) {
     // Camera
+    let far = 1000.0;
     commands
         .spawn_bundle(OrthographicCameraBundle::new_2d())
+        .insert(
+            Transform::from_scale(Vec2::splat(0.5).extend(1.0))
+                * Transform::from_xyz(0.0, 0.0, far - 0.1),
+        )
         .insert(MainCamera);
 
     // Background
     commands.spawn_bundle(SpriteBundle {
         material: handles.bg_material.clone(),
-        transform: Transform::from_scale(Vec3::splat(2.)),
         ..Default::default()
     });
 
@@ -349,14 +347,14 @@ fn setup_base(mut commands: Commands, handles: Res<Handles>) {
     commands.spawn_bundle(SpriteSheetBundle {
         sprite: TextureAtlasSprite::new(0),
         texture_atlas: handles.controls_atlas.clone(),
-        transform: Transform::from_xyz(-335., -235., 0.) * Transform::from_scale(Vec3::splat(2.0)),
+        transform: Transform::from_xyz(-167.5, -117.5, 0.),
         ..Default::default()
     });
     // Restart button
     commands.spawn_bundle(SpriteSheetBundle {
         sprite: TextureAtlasSprite::new(1),
         texture_atlas: handles.controls_atlas.clone(),
-        transform: Transform::from_xyz(335., -235., 0.) * Transform::from_scale(Vec3::splat(2.0)),
+        transform: Transform::from_xyz(167.5, -117.5, 0.),
         ..Default::default()
     });
 
@@ -368,11 +366,11 @@ fn setup_base(mut commands: Commands, handles: Res<Handles>) {
 
     // Mouse
     let hoof_shape = vec![
-        [9.0, 34.0],
-        [-32.0, -9.0],
-        [-12.0, -33.0],
-        [34.0, -15.0],
-        [21.0, 24.0],
+        [4.5, 17.0],
+        [-16.0, -4.5],
+        [-6.0, -16.5],
+        [17.0, -7.5],
+        [10.5, 12.0],
     ];
     commands
         .spawn_bundle(SpriteBundle {
@@ -380,6 +378,10 @@ fn setup_base(mut commands: Commands, handles: Res<Handles>) {
         })
         .insert_bundle(RigidBodyBundle {
             body_type: RigidBodyType::KinematicPositionBased,
+            // ccd: RigidBodyCcd {
+            //     ccd_enabled: true,
+            //     ..Default::default()
+            // },
             ..Default::default()
         })
         .insert_bundle(ColliderBundle {
@@ -399,8 +401,8 @@ fn setup_base(mut commands: Commands, handles: Res<Handles>) {
         .with_children(|parent| {
             parent.spawn_bundle(SpriteBundle {
                 // sprite: Sprite::new(Vec2::new(345. * 2., 122. * 2.)),
-                transform: Transform::from_xyz(400. - 38., -324. + 38., 500.)
-                    * Transform::from_scale(Vec3::splat(2.)),
+                transform: Transform::from_xyz(200. - 19., -162. + 19., 500.),
+                // transform: Transform::from_xyz(0.0, 0.0, 500.),
                 material: handles.leg_material.clone(),
                 ..Default::default()
             });
@@ -414,7 +416,6 @@ fn start_level(commands: &mut Commands, handles: &Res<Handles>) {
         // .spawn_bundle(SpriteSheetBundle {
         //     sprite: TextureAtlasSprite::new(1),
         //     texture_atlas: atlas,
-        //     transform: Transform::from_scale(Vec3::splat(2.0)),
         //     ..Default::default()
         // })
         // .insert_bundle(RigidBodyBundle {
@@ -424,15 +425,13 @@ fn start_level(commands: &mut Commands, handles: &Res<Handles>) {
         .with_children(|parent| {
             // parent.spawn_bundle(SpriteBundle {
             //     // sprite: Sprite::new(Vec2::new(345. * 2., 122. * 2.)),
-            //     transform: Transform::from_xyz(400. - 38., -324. + 38., 500.)
-            //         * Transform::from_scale(Vec3::splat(2.)),
+            //     transform: Transform::from_xyz(400. - 38., -324. + 38., 500.),
             //     material: handles.leg_material.clone(),
             //     ..Default::default()
             // });
             parent.spawn_bundle(SpriteSheetBundle {
                 sprite: TextureAtlasSprite::new(19),
                 texture_atlas: handles.items_atlas.clone(),
-                transform: Transform::from_scale(Vec3::splat(2.0)),
                 ..Default::default()
             });
             // parent
@@ -558,8 +557,8 @@ fn update_recipe_events(
         commands
             .spawn()
             .insert_bundle(SpriteBundle {
-                transform: Transform::from_xyz(0., 300., 1.)
-                    * Transform::from_scale(Vec3::splat(1.5)),
+                transform: Transform::from_xyz(0., 150., 1.)
+                    * Transform::from_scale(Vec3::splat(0.75)),
                 ..Default::default()
             })
             .insert(RecipeDisplay)
@@ -662,11 +661,11 @@ fn level_inputs(
 ) {
     if buttons.just_released(MouseButton::Left) {
         // Exit
-        if (mouse_position_world.0 - Vec2::new(-335., -235.)).length() < 45.0 {
+        if (mouse_position_world.0 - Vec2::new(-167.5, -117.5)).length() < 22.5 {
             exit.send(AppExit);
         }
         // Restart
-        if (mouse_position_world.0 - Vec2::new(335., -235.)).length() < 45.0 {
+        if (mouse_position_world.0 - Vec2::new(167.5, -117.5)).length() < 22.5 {
             reset_level_events.send(ResetLevelEvent);
         }
     }
