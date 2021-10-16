@@ -1,112 +1,63 @@
 use bevy::prelude::*;
 
-use crate::handles::Handles;
+use crate::handles::Bundles;
 
-use crate::{
-    bone1, bone2, cubes, eyed_vial, golden_nuggets, mug, radioactive_vial, vial_stand, yorick,
-};
+use crate::items::SpawnItemBundleExt;
 
-pub fn spawn_level0(commands: &mut Commands, handles: &Res<Handles>) {
-    bone1(commands, handles.items_atlas.clone(), Vec2::new(96., 44.5));
-    bone2(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(96., 44.5 + 20.),
-    );
-    cubes(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-150., -25.),
-    );
-    eyed_vial(commands, handles.items_atlas.clone(), Vec2::new(-95., 118.));
-    yorick(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-160., 115.),
-    );
+pub fn spawn_level0(commands: &mut Commands, bundles: &Res<Bundles>) {
+    commands
+        .spawn_item_bundle(bundles.bone1.clone(), Vec2::new(96., 44.5))
+        .spawn_item_bundle(bundles.bone2.clone(), Vec2::new(96., 44.5 + 20.))
+        .spawn_item_bundle(bundles.cubes.clone(), Vec2::new(-150., -25.))
+        .spawn_item_bundle(bundles.eyed_vial.clone(), Vec2::new(-95., 118.))
+        .spawn_item_bundle(bundles.yorick.clone(), Vec2::new(-160., 115.));
 }
 
-pub fn spawn_level1(commands: &mut Commands, handles: &Res<Handles>) {
-    eyed_vial(commands, handles.items_atlas.clone(), Vec2::new(90., -10.));
-    bone1(commands, handles.items_atlas.clone(), Vec2::new(100., 100.));
-    bone2(commands, handles.items_atlas.clone(), Vec2::new(100., 125.));
-    mug(commands, handles.items_atlas.clone(), Vec2::new(155., 52.));
-    cubes(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-100., -26.),
-    );
-    yorick(commands, handles.items_atlas.clone(), Vec2::new(-100., 46.));
-    golden_nuggets(commands, handles.items_atlas.clone(), Vec2::new(-159., 35.));
+pub fn spawn_level1(commands: &mut Commands, bundles: &Res<Bundles>) {
+    commands
+        .spawn_item_bundle(bundles.eyed_vial.clone(), Vec2::new(90., -10.))
+        .spawn_item_bundle(bundles.bone1.clone(), Vec2::new(100., 100.))
+        .spawn_item_bundle(bundles.bone2.clone(), Vec2::new(100., 100. + 25.))
+        .spawn_item_bundle(bundles.mug.clone(), Vec2::new(155., 52.))
+        .spawn_item_bundle(bundles.cubes.clone(), Vec2::new(-100., -26.))
+        .spawn_item_bundle(bundles.yorick.clone(), Vec2::new(-100., 46.))
+        .spawn_item_bundle(bundles.golden_nuggets.clone(), Vec2::new(-159., 35.));
 }
 
-pub fn spawn_level2(commands: &mut Commands, handles: &Res<Handles>) {
-    eyed_vial(commands, handles.items_atlas.clone(), Vec2::new(-94., 55.));
-    radioactive_vial(commands, handles.items_atlas.clone(), Vec2::new(-150., -5.));
-    bone1(commands, handles.items_atlas.clone(), Vec2::new(100., 100.));
-    bone2(commands, handles.items_atlas.clone(), Vec2::new(100., 125.));
-    mug(commands, handles.items_atlas.clone(), Vec2::new(155., 52.));
-    cubes(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-100., -26.),
-    );
-    yorick(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-135., 112.),
-    );
-    golden_nuggets(commands, handles.items_atlas.clone(), Vec2::new(93., 35.));
+pub fn spawn_level2(commands: &mut Commands, bundles: &Res<Bundles>) {
+    commands
+        .spawn_item_bundle(bundles.eyed_vial.clone(), Vec2::new(-94., 55.))
+        .spawn_item_bundle(bundles.radioactive_vial.clone(), Vec2::new(-150., -5.))
+        .spawn_item_bundle(bundles.bone1.clone(), Vec2::new(100., 100.))
+        .spawn_item_bundle(bundles.bone2.clone(), Vec2::new(100., 100. + 25.))
+        .spawn_item_bundle(bundles.mug.clone(), Vec2::new(155., 52.))
+        .spawn_item_bundle(bundles.cubes.clone(), Vec2::new(-100., -26.))
+        .spawn_item_bundle(bundles.yorick.clone(), Vec2::new(-135., 112.))
+        .spawn_item_bundle(bundles.golden_nuggets.clone(), Vec2::new(93., 35.));
 }
 
-pub fn spawn_level3(commands: &mut Commands, handles: &Res<Handles>) {
-    eyed_vial(commands, handles.items_atlas.clone(), Vec2::new(100., -10.));
-    radioactive_vial(commands, handles.items_atlas.clone(), Vec2::new(-100., 0.));
-    bone1(commands, handles.items_atlas.clone(), Vec2::new(100., 100.));
-    bone2(commands, handles.items_atlas.clone(), Vec2::new(100., 125.));
-    mug(commands, handles.items_atlas.clone(), Vec2::new(160., 120.));
-    yorick(commands, handles.items_atlas.clone(), Vec2::new(-155., 55.));
-    vial_stand(commands, handles.items_atlas.clone(), Vec2::new(-100., 60.));
-    cubes(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-150., -21.),
-    );
-    golden_nuggets(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-100., 100.),
-    );
+pub fn spawn_level3(commands: &mut Commands, bundles: &Res<Bundles>) {
+    commands
+        .spawn_item_bundle(bundles.eyed_vial.clone(), Vec2::new(100., -10.))
+        .spawn_item_bundle(bundles.radioactive_vial.clone(), Vec2::new(-100., 0.))
+        .spawn_item_bundle(bundles.bone1.clone(), Vec2::new(100., 100.))
+        .spawn_item_bundle(bundles.bone2.clone(), Vec2::new(100., 100. + 25.))
+        .spawn_item_bundle(bundles.mug.clone(), Vec2::new(160., 120.))
+        .spawn_item_bundle(bundles.yorick.clone(), Vec2::new(-166., 55.))
+        .spawn_item_bundle(bundles.vial_stand.clone(), Vec2::new(-100., 60.))
+        .spawn_item_bundle(bundles.cubes.clone(), Vec2::new(-150., -21.))
+        .spawn_item_bundle(bundles.golden_nuggets.clone(), Vec2::new(-100., 100.));
 }
 
-pub fn spawn_level4(commands: &mut Commands, handles: &Res<Handles>) {
-    eyed_vial(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-159., 119.),
-    );
-    radioactive_vial(commands, handles.items_atlas.clone(), Vec2::new(163., -8.));
-    mug(commands, handles.items_atlas.clone(), Vec2::new(-153., 50.));
-    yorick(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-156., -13.),
-    );
-    vial_stand(commands, handles.items_atlas.clone(), Vec2::new(100., 55.));
-    golden_nuggets(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-100., -22.),
-    );
-    bone1(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-100., 100.),
-    );
-    bone2(
-        commands,
-        handles.items_atlas.clone(),
-        Vec2::new(-100., 125.),
-    );
-    cubes(commands, handles.items_atlas.clone(), Vec2::new(111., 105.));
+pub fn spawn_level4(commands: &mut Commands, bundles: &Res<Bundles>) {
+    commands
+        .spawn_item_bundle(bundles.eyed_vial.clone(), Vec2::new(-159., 119.))
+        .spawn_item_bundle(bundles.radioactive_vial.clone(), Vec2::new(163., -8.))
+        .spawn_item_bundle(bundles.mug.clone(), Vec2::new(-153., 50.))
+        .spawn_item_bundle(bundles.yorick.clone(), Vec2::new(-156., -13.))
+        .spawn_item_bundle(bundles.vial_stand.clone(), Vec2::new(100., 55.))
+        .spawn_item_bundle(bundles.golden_nuggets.clone(), Vec2::new(-100., -22.))
+        .spawn_item_bundle(bundles.bone1.clone(), Vec2::new(-100., 100.))
+        .spawn_item_bundle(bundles.bone2.clone(), Vec2::new(-100., 100. + 25.))
+        .spawn_item_bundle(bundles.cubes.clone(), Vec2::new(111., 105.));
 }

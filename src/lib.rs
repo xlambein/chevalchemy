@@ -10,8 +10,7 @@ mod texture_atlas;
 #[cfg(target_arch = "wasm32")]
 mod wasm;
 
-use handles::Handles;
-use items::*;
+use handles::{Bundles, Handles};
 use levels::*;
 
 #[wasm_bindgen]
@@ -34,6 +33,10 @@ pub fn run() {
     .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
     .add_plugin(RapierRenderPlugin)
     .add_system(bevy::input::system::exit_on_esc_system.system())
+    // Assets
+    .add_asset::<items::Item>()
+    .add_asset::<items::ItemBundle>()
+    .add_asset::<levels::Level>()
     // Events
     .add_event::<StartLevelEvent>()
     .add_event::<UpdateRecipeEvent>()
@@ -41,6 +44,7 @@ pub fn run() {
     .add_event::<NextLevelEvent>()
     .add_event::<ItemInCauldronEvent>()
     .init_resource::<Handles>()
+    .init_resource::<Bundles>()
     .insert_resource(MousePositionWorld::default())
     .add_startup_system(setup.system().label("setup"))
     .add_startup_system(setup_base.system().after("setup"))
@@ -103,24 +107,42 @@ impl CurrentLevel {
     }
 
     fn recipe(&self) -> Vec<ItemType> {
-        use ItemType::*;
         match self.0 {
-            0 => vec![Cube, Bone, Cube],
-            1 => vec![Gold, EyedVial, Bone],
-            2 => vec![EyedVial, RadioactiveVial, Bone, Cube],
-            3 => vec![EyedVial, Mug, YellowVial, Bone],
-            4 => vec![RedVial, Gold, EyedVial, BlueVial],
+            0 => vec!["cube".to_owned(), "bone".to_owned(), "cube".to_owned()],
+            1 => vec![
+                "gold_nugget".to_owned(),
+                "eyed_vial".to_owned(),
+                "bone".to_owned(),
+            ],
+            2 => vec![
+                "eyed_vial".to_owned(),
+                "radioactive_vial".to_owned(),
+                "bone".to_owned(),
+                "cube".to_owned(),
+            ],
+            3 => vec![
+                "eyed_vial".to_owned(),
+                "mug".to_owned(),
+                "yellow_vial".to_owned(),
+                "bone".to_owned(),
+            ],
+            4 => vec![
+                "red_vial".to_owned(),
+                "gold_nugget".to_owned(),
+                "eyed_vial".to_owned(),
+                "blue_vial".to_owned(),
+            ],
             _ => unreachable!(),
         }
     }
 
-    fn spawn(&self, commands: &mut Commands, handles: &Res<Handles>) {
+    fn spawn(&self, commands: &mut Commands, bundles: &Res<Bundles>) {
         match self.0 {
-            0 => spawn_level0(commands, handles),
-            1 => spawn_level1(commands, handles),
-            2 => spawn_level2(commands, handles),
-            3 => spawn_level3(commands, handles),
-            4 => spawn_level4(commands, handles),
+            0 => spawn_level0(commands, bundles),
+            1 => spawn_level1(commands, bundles),
+            2 => spawn_level2(commands, bundles),
+            3 => spawn_level3(commands, bundles),
+            4 => spawn_level4(commands, bundles),
             _ => unreachable!(),
         }
     }
@@ -153,6 +175,26 @@ impl CurrentRecipe {
     }
 }
 
+type ItemType = String;
+
+fn item_type_to_atlas_index(item_type: &str) -> u32 {
+    match item_type {
+        "eyed_vial" => 0,
+        "support" => 1,
+        "radioactive_vial" => 3,
+        "bone" => 5,
+        "mug" => 7,
+        "yorick" => 8,
+        "vial_stand" => 9,
+        "red_vial" => 11,
+        "yellow_vial" => 12,
+        "blue_vial" => 13,
+        "cube" => 14,
+        "gold_nugget" => 20,
+        _ => panic!("unknown item type '{}'", item_type),
+    }
+}
+
 struct StartLevelEvent(u32);
 struct UpdateRecipeEvent;
 struct ResetLevelEvent;
@@ -167,23 +209,6 @@ struct RecipeDisplay;
 
 #[derive(Default)]
 struct MousePositionWorld(Vec2);
-
-#[derive(Clone, Copy, PartialEq)]
-#[repr(u32)]
-enum ItemType {
-    EyedVial = 0,
-    Support = 1,
-    RadioactiveVial = 3,
-    Bone = 5,
-    Mug = 7,
-    Yorick = 8,
-    VialStand = 9,
-    RedVial = 11,
-    YellowVial = 12,
-    BlueVial = 13,
-    Cube = 14,
-    Gold = 20,
-}
 
 fn spawn_cuboid(commands: &mut Commands, pos: Vec2, size: Vec2) {
     commands
@@ -214,15 +239,34 @@ fn spawn_cupboard(commands: &mut Commands) {
     spawn_cuboid(commands, Vec2::new(125., -37.), board_size);
 }
 
-fn make_convex_hull(shape: &[[f32; 2]]) -> ColliderShape {
-    ColliderShape::convex_hull(&shape.iter().cloned().map(Into::into).collect::<Vec<_>>()).unwrap()
+fn is_clockwise(vertices: &[[f32; 2]]) -> bool {
+    (vertices
+        .iter()
+        .zip(vertices.iter().cycle().skip(1))
+        .map(|([x0, y0], [x1, y1])| x0 * y1 - x1 * y0)
+        .sum::<f32>())
+        < 0.0
+}
+
+fn make_convex_poly(shape: &[[f32; 2]]) -> ColliderShape {
+    let shape = if is_clockwise(shape) {
+        shape
+            .iter()
+            .rev()
+            .cloned()
+            .map(Into::into)
+            .collect::<Vec<_>>()
+    } else {
+        shape.iter().cloned().map(Into::into).collect::<Vec<_>>()
+    };
+    ColliderShape::convex_polyline(shape).unwrap()
 }
 
 fn make_compound_shape(shapes: &[Vec<[f32; 2]>]) -> ColliderShape {
     ColliderShape::compound(
         shapes
             .iter()
-            .map(|shape| ([0., 0.].into(), make_convex_hull(shape)))
+            .map(|shape| ([0., 0.].into(), make_convex_poly(shape)))
             .collect(),
     )
 }
@@ -274,7 +318,7 @@ fn cauldron(commands: &mut Commands, handles: &Res<Handles>) {
             parent
                 .spawn_bundle(ColliderBundle {
                     collider_type: ColliderType::Sensor,
-                    shape: make_convex_hull(&sensor),
+                    shape: make_convex_poly(&sensor),
                     ..Default::default()
                 })
                 .insert(CauldronSensor);
@@ -387,8 +431,8 @@ fn setup_base(mut commands: Commands, handles: Res<Handles>) {
         })
         .insert_bundle(ColliderBundle {
             // shape: ColliderShape::ball(10.0),
-            shape: ColliderShape::convex_hull(
-                &hoof_shape
+            shape: ColliderShape::convex_polyline(
+                hoof_shape
                     .iter()
                     .cloned()
                     .map(Into::into)
@@ -521,7 +565,7 @@ fn cauldron_detector(
         if let Ok(item) = items.get(other) {
             commands.entity(other).despawn_recursive();
 
-            item_in_cauldron_events.send(ItemInCauldronEvent(item.0));
+            item_in_cauldron_events.send(ItemInCauldronEvent(item.0.clone()));
         }
     }
 }
@@ -567,7 +611,7 @@ fn update_recipe_events(
                 let mut x = -35.;
                 let mut y = -60.;
                 for (i, item) in current_recipe.items.iter().enumerate() {
-                    let index = *item as u32;
+                    let index = item_type_to_atlas_index(&item);
                     parent.spawn_bundle(SpriteSheetBundle {
                         sprite: TextureAtlasSprite::new(index),
                         texture_atlas: handles.items_atlas.clone(),
@@ -628,13 +672,13 @@ fn reset_level_events(
     mut update_recipe_events: EventWriter<UpdateRecipeEvent>,
 
     mut commands: Commands,
-    handles: Res<Handles>,
+    bundles: Res<Bundles>,
     items: Query<Entity, With<Item>>,
 ) {
     if let Some(_) = reset_level_events.iter().last() {
         *current_recipe = CurrentRecipe::new(current_level.recipe());
         items.for_each(|e| commands.entity(e).despawn_recursive());
-        current_level.spawn(&mut commands, &handles);
+        current_level.spawn(&mut commands, &bundles);
         update_recipe_events.send(UpdateRecipeEvent);
     }
 }

@@ -1,0 +1,64 @@
+[
+    (
+        label: "eyed_vial",
+        items: [
+            ((0.0, 0.0), "items.items#eyed_vial"),
+            ((-18.0, -20.0), "items.items#triangle_support01"),
+            ((18.0, -20.0), "items.items#triangle_support02"),
+        ]
+    ),
+    (
+        label: "radioactive_vial",
+        items: [((0.0, 0.0), "items.items#radioactive_vial")]
+    ),
+    (
+        label: "bone1",
+        items: [((0.0, 0.0), "items.items#bone1")]
+    ),
+    (
+        label: "bone2",
+        items: [
+            ((-10.0, 0.0), "items.items#bone2a"),
+            ((10.0, -20.0), "items.items#bone2b"),
+        ]
+    ),
+    (
+        label: "mug",
+        items: [((0.0, 0.0), "items.items#mug")]
+    ),
+    (
+        label: "yorick",
+        items: [((0.0, 0.0), "items.items#yorick")]
+    ),
+    (
+        label: "vial_stand",
+        items: [
+            ((0.0, 0.0), "items.items#vial_stand"),
+            ((-18.0, 7.0), "items.items#red_vial"),
+            ((-1.0, 7.0), "items.items#yellow_vial"),
+            ((19.0, 7.0), "items.items#blue_vial"),
+        ]
+    ),
+    (
+        label: "cubes",
+        items: [
+            ((0.0, 32.0), "items.items#cube01"),
+            ((-8.0, 16.0), "items.items#cube02"),
+            ((8.0, 16.0), "items.items#cube03"),
+            ((-16.0, 0.0), "items.items#cube04"),
+            ((0.0, 0.0), "items.items#cube05"),
+            ((16.0, 0.0), "items.items#cube06"),
+        ]
+    ),
+    (
+        label: "golden_nuggets",
+        items: [
+            ((0.0, 32.0), "items.items#gold_nugget01"),
+            ((-7.5, 16.0), "items.items#gold_nugget02"),
+            ((7.5, 16.0), "items.items#gold_nugget03"),
+            ((-15.0, 0.0), "items.items#gold_nugget04"),
+            ((0.0, 0.0), "items.items#gold_nugget05"),
+            ((15.0, 0.0), "items.items#gold_nugget06"),
+        ]
+    ),
+]

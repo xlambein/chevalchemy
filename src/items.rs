@@ -1,361 +1,280 @@
-use crate::{make_compound_shape, make_convex_hull};
-use bevy::{ecs::system::EntityCommands, prelude::*};
-use bevy_rapier2d::prelude::*;
+use anyhow::Result;
+use bevy::{
+    asset::{AssetLoader, AssetPath, LoadedAsset},
+    ecs::system::{Command, CommandQueue, EntityCommands},
+    prelude::*,
+    reflect::TypeUuid,
+    utils::BoxedFuture,
+};
+use bevy_rapier2d::{na, prelude::*};
+use serde::Deserialize;
 
-use crate::{Item, ItemType};
+fn is_clockwise(vertices: &[Vec2]) -> bool {
+    (vertices
+        .iter()
+        .zip(vertices.iter().cycle().skip(1))
+        .map(|(u0, u1)| u0.x * u1.y - u1.x * u0.y)
+        .sum::<f32>())
+        < 0.0
+}
 
-fn spawn_from_atlas<'a, 'b>(
-    commands: &'b mut Commands<'a>,
-    atlas: Handle<TextureAtlas>,
-    index: u32,
-    item_type: ItemType,
-    position: Vec2,
-    shape: ColliderShape,
-) -> EntityCommands<'a, 'b> {
-    let mut entity = commands.spawn_bundle(SpriteSheetBundle {
-        sprite: TextureAtlasSprite::new(index),
-        texture_atlas: atlas.clone(),
-        transform: Transform::from_xyz(0., 0., 5.),
-        ..Default::default()
-    });
-    entity
-        .insert_bundle(RigidBodyBundle {
-            position: position.into(),
-            // ccd: RigidBodyCcd {
-            //     ccd_enabled: true,
-            //     ..Default::default()
-            // },
-            ..Default::default()
+#[derive(Debug, Clone, Deserialize)]
+enum Shape {
+    Ball(f32),
+    Cuboid(Vec2),
+    RoundCuboid(Vec2, f32),
+    ConvexPolygon(Vec<Vec2>),
+}
+
+impl Into<ColliderShape> for Shape {
+    fn into(self) -> ColliderShape {
+        match self {
+            Shape::Ball(radius) => ColliderShape::ball(radius),
+            Shape::Cuboid(half_extents) => ColliderShape::cuboid(half_extents.x, half_extents.y),
+            Shape::RoundCuboid(half_extents, radius) => {
+                ColliderShape::round_cuboid(half_extents.x, half_extents.y, radius)
+            }
+            Shape::ConvexPolygon(vertices) => {
+                ColliderShape::convex_polyline(if is_clockwise(&vertices) {
+                    vertices
+                        .iter()
+                        .rev()
+                        .map(|v| na::Point2::new(v.x, v.y))
+                        .collect::<Vec<_>>()
+                } else {
+                    vertices
+                        .iter()
+                        .map(|v| na::Point2::new(v.x, v.y))
+                        .collect::<Vec<_>>()
+                })
+                .unwrap()
+            }
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct ItemFile {
+    label: String,
+    #[serde(rename = "type")]
+    ty: String,
+    texture_atlas: String,
+    texture_index: u32,
+    colliders: Vec<(Vec2, Shape)>,
+}
+
+#[derive(Debug, Clone, TypeUuid)]
+#[uuid = "3226f39f-1918-421a-b3a0-e0b2ad20932e"]
+pub struct Item {
+    label: String,
+    ty: String,
+    texture_atlas: Handle<TextureAtlas>,
+    texture_index: u32,
+    colliders: Vec<(Vec2, Shape)>,
+}
+
+impl Item {
+    pub fn spawn(&self, commands: &mut EntityCommands, position: Vec2) {
+        let shape = ColliderShape::compound(
+            self.colliders
+                .iter()
+                .cloned()
+                .map(|(pos, shape)| (pos.into(), shape.into()))
+                .collect(),
+        );
+        commands
+            .insert_bundle(SpriteSheetBundle {
+                sprite: TextureAtlasSprite::new(self.texture_index),
+                texture_atlas: self.texture_atlas.clone(),
+                transform: Transform::from_xyz(0., 0., 5.),
+                ..Default::default()
+            })
+            .insert_bundle(RigidBodyBundle {
+                position: position.into(),
+                ..Default::default()
+            })
+            .insert_bundle(ColliderBundle {
+                shape,
+                ..Default::default()
+            })
+            .insert(RigidBodyPositionSync::Discrete)
+            .insert(crate::Item(self.ty.clone()));
+    }
+}
+
+#[derive(Deserialize)]
+struct ItemBundleFile {
+    label: String,
+    items: Vec<(Vec2, String)>,
+}
+
+#[derive(Debug, Clone, TypeUuid)]
+#[uuid = "6c68c7cc-59f1-4686-927b-8ebb53f06df1"]
+pub struct ItemBundle {
+    label: String,
+    items: Vec<(Vec2, Handle<Item>)>,
+}
+
+impl ItemBundle {
+    pub fn spawn(&self, commands: &mut Commands, items: &Assets<Item>, position: Vec2) {
+        for (offset, item) in &self.items {
+            items
+                .get(item)
+                .unwrap()
+                .spawn(&mut commands.spawn(), position + *offset);
+        }
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct ItemLoader;
+
+const FILE_EXTENSIONS: &[&str] = &["items"];
+
+impl AssetLoader for ItemLoader {
+    fn load<'a>(
+        &'a self,
+        bytes: &'a [u8],
+        load_context: &'a mut bevy::asset::LoadContext<'_>,
+    ) -> BoxedFuture<'a, Result<()>> {
+        Box::pin(async move {
+            // TODO single-item file?
+            let items: Vec<ItemFile> = ron::de::from_bytes(bytes)?;
+            items.into_iter().for_each(|item| {
+                let ItemFile {
+                    label,
+                    ty,
+                    texture_atlas,
+                    texture_index,
+                    colliders,
+                } = item;
+
+                let texture_atlas: Handle<TextureAtlas> =
+                    load_context.get_handle(AssetPath::from(texture_atlas.as_str()).get_id());
+
+                let asset = Item {
+                    label: label.clone(),
+                    ty,
+                    texture_atlas,
+                    texture_index,
+                    colliders,
+                };
+                load_context.set_labeled_asset(&label, LoadedAsset::new(asset));
+            });
+
+            Ok(())
         })
-        .insert_bundle(ColliderBundle {
-            shape,
-            ..Default::default()
+    }
+
+    fn extensions(&self) -> &[&str] {
+        FILE_EXTENSIONS
+    }
+}
+
+#[derive(Clone, Default)]
+pub struct ItemBundleLoader;
+
+const BUNDLE_FILE_EXTENSIONS: &[&str] = &["bundles"];
+
+impl AssetLoader for ItemBundleLoader {
+    fn load<'a>(
+        &'a self,
+        bytes: &'a [u8],
+        load_context: &'a mut bevy::asset::LoadContext<'_>,
+    ) -> BoxedFuture<'a, Result<()>> {
+        Box::pin(async move {
+            // TODO single-bundle file?
+            let bundles: Vec<ItemBundleFile> = ron::de::from_bytes(bytes)?;
+            bundles.into_iter().for_each(|bundle| {
+                let ItemBundleFile { label, items } = bundle;
+
+                let items = items
+                    .into_iter()
+                    .map(|(pos, path)| {
+                        (
+                            pos,
+                            load_context.get_handle(AssetPath::from(path.as_str()).get_id()),
+                        )
+                    })
+                    .collect();
+
+                let asset = ItemBundle {
+                    label: label.clone(),
+                    items,
+                };
+                load_context.set_labeled_asset(&label, LoadedAsset::new(asset));
+            });
+
+            Ok(())
         })
-        .insert(RigidBodyPositionSync::Discrete)
-        .insert(Item(item_type));
-    entity
+    }
+
+    fn extensions(&self) -> &[&str] {
+        BUNDLE_FILE_EXTENSIONS
+    }
 }
 
-pub fn eyed_vial(commands: &mut Commands, atlas: Handle<TextureAtlas>, position: Vec2) {
-    // Vial
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        0,
-        ItemType::EyedVial,
-        position,
-        ColliderShape::compound(vec![
-            ([0., -4.].into(), ColliderShape::ball(18.)),
-            ([0., 18.].into(), ColliderShape::cuboid(5.0, 7.5)),
-        ]),
-    );
-
-    // Support 1
-    let shape = vec![[-2.5, 6.0], [-6.0, -7.0], [6.5, -5.0]];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        1,
-        ItemType::Support,
-        position + Vec2::new(-18., -20.),
-        make_convex_hull(&shape),
-    );
-
-    // Support 2
-    let shape = vec![[0.5, 6.0], [-6.5, -6.5], [6.5, -7.0]];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        2,
-        ItemType::Support,
-        position + Vec2::new(18., -20.),
-        make_convex_hull(&shape),
-    );
+pub struct SpawnItemBundle {
+    pub bundle: Handle<ItemBundle>,
+    pub position: Vec2,
 }
 
-pub fn radioactive_vial(commands: &mut Commands, atlas: Handle<TextureAtlas>, position: Vec2) {
-    let shapes = vec![
-        vec![[-11.5, -24.5], [-5.5, 2.0], [5.0, 3.0], [12.5, -23.0]],
-        vec![[-5.5, 2.0], [-6.5, 20.5], [6.0, 24.0], [5.0, 3.0]],
-    ];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        3,
-        ItemType::RadioactiveVial,
-        position,
-        make_compound_shape(&shapes),
-    );
+impl Command for SpawnItemBundle {
+    fn write(self: Box<Self>, world: &mut World) {
+        let mut command_queue = CommandQueue::default();
+        let mut commands = Commands::new(&mut command_queue, world);
+        let bundles = world.get_resource::<Assets<ItemBundle>>().unwrap();
+        let items = world.get_resource::<Assets<Item>>().unwrap();
+
+        if bundles.get(self.bundle.clone()).is_none() {
+            eprintln!("error: could not find bundle '{:?}'", &self.bundle);
+            return;
+        }
+
+        for (offset, item) in &bundles.get(self.bundle).unwrap().items {
+            if items.get(item).is_none() {
+                eprintln!("error: could not find item '{:?}'", item);
+                continue;
+            }
+            let item = items.get(item).unwrap();
+            let shape = ColliderShape::compound(
+                item.colliders
+                    .iter()
+                    .cloned()
+                    .map(|(pos, shape)| (pos.into(), shape.into()))
+                    .collect(),
+            );
+            commands
+                .spawn()
+                .insert_bundle(SpriteSheetBundle {
+                    sprite: TextureAtlasSprite::new(item.texture_index),
+                    texture_atlas: item.texture_atlas.clone(),
+                    transform: Transform::from_xyz(0., 0., 5.),
+                    ..Default::default()
+                })
+                .insert_bundle(RigidBodyBundle {
+                    position: (self.position + *offset).into(),
+                    ..Default::default()
+                })
+                .insert_bundle(ColliderBundle {
+                    shape,
+                    ..Default::default()
+                })
+                .insert(RigidBodyPositionSync::Discrete)
+                .insert(crate::Item(item.ty.clone()));
+        }
+
+        command_queue.apply(world);
+    }
 }
 
-pub fn bone1(commands: &mut Commands, atlas: Handle<TextureAtlas>, position: Vec2) {
-    let shapes = vec![
-        vec![[-19.5, 1.5], [-27.0, 3.5], [-33.5, -8.0], [-19.5, -7.0]],
-        vec![[-19.5, 1.5], [-19.5, -7.0], [24.5, -6.5], [20.0, 3.0]],
-        vec![[24.5, -6.5], [33.5, -8.0], [32.5, 7.5], [20.0, 3.0]],
-    ];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        4,
-        ItemType::Bone,
-        position,
-        make_compound_shape(&shapes),
-    );
+pub trait SpawnItemBundleExt {
+    fn spawn_item_bundle(&mut self, bundle: Handle<ItemBundle>, position: Vec2) -> &mut Self;
 }
 
-pub fn bone2(commands: &mut Commands, atlas: Handle<TextureAtlas>, position: Vec2) {
-    let shapes = vec![
-        vec![[-17.0, 5.5], [-17.5, -6.0], [-7.0, -4.0], [-9.5, 4.0]],
-        vec![[-7.0, -4.0], [15.5, -2.5], [15.0, 3.5], [-9.5, 4.0]],
-    ];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        5,
-        ItemType::Bone,
-        position + Vec2::new(-10.0, 0.0),
-        make_compound_shape(&shapes),
-    );
-
-    let shapes = vec![
-        vec![[-16.0, 4.0], [-17.0, -2.5], [4.0, -1.5], [14.5, 3.5]],
-        vec![[4.0, -1.5], [18.5, -7.5], [20.0, 5.5], [14.5, 3.5]],
-    ];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        6,
-        ItemType::Bone,
-        position + Vec2::new(10.0, 0.0),
-        make_compound_shape(&shapes),
-    );
-}
-
-pub fn mug(commands: &mut Commands, atlas: Handle<TextureAtlas>, position: Vec2) {
-    let shapes = vec![
-        vec![[19.0, 17.5], [-6.5, 17.5], [-10.5, -16.5], [15.5, -18.5]],
-        vec![
-            [-8.5, 10.5],
-            [-14.5, 11.0],
-            [-19.0, 4.0],
-            [-19.0, -7.5],
-            [-15.0, -12.5],
-            [-10.0, -13.0],
-        ],
-    ];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        7,
-        ItemType::Mug,
-        position,
-        make_compound_shape(&shapes),
-    );
-}
-
-pub fn yorick(commands: &mut Commands, atlas: Handle<TextureAtlas>, position: Vec2) {
-    let jaw = vec![
-        [-15.5, -3.0],
-        [-24.0, -13.0],
-        [-12.5, -21.5],
-        [-4.0, -21.0],
-        [-0.0, -16.0],
-    ];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        8,
-        ItemType::Yorick,
-        position,
-        ColliderShape::compound(vec![
-            ([3.5, -0.5].into(), ColliderShape::ball(16.5)),
-            ([0., 0.].into(), make_convex_hull(&jaw)),
-        ]),
-    );
-}
-
-pub fn vial_stand(commands: &mut Commands, atlas: Handle<TextureAtlas>, position: Vec2) {
-    let shapes = vec![
-        // Bottom
-        vec![[33.0, -11.0], [33.0, -22.0], [-29.5, -21.0], [-33.0, -12.5]],
-        // Top left
-        vec![[-34.0, 10.0], [-34.0, 17.0], [-27.5, 20.0], [-26.0, 10.5]],
-        // Top center-left
-        vec![[-5.5, 11.0], [-10.5, 10.5], [-10.0, 20.0], [-6.5, 20.0]],
-        // Top center-right
-        vec![[8.5, 12.5], [14.5, 12.0], [14.0, 20.0], [9.5, 20.5]],
-        // Top right
-        vec![[27.0, 10.5], [26.5, 20.5], [34.0, 20.5], [34.5, 10.0]],
-    ];
-    let mut entity = spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        9,
-        ItemType::VialStand,
-        position,
-        make_compound_shape(&shapes),
-    );
-    // Front
-    entity.with_children(|parent| {
-        parent.spawn_bundle(SpriteSheetBundle {
-            sprite: TextureAtlasSprite::new(10),
-            texture_atlas: atlas.clone(),
-            transform: Transform::from_xyz(0., 0., 10.),
-            ..Default::default()
-        });
-    });
-
-    // Red vial
-    let shape = vec![[-5.0, 19.5], [-4.0, -22.0], [4.5, -20.5], [5.0, 21.5]];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        11,
-        ItemType::RedVial,
-        position + Vec2::new(-18., 7.),
-        make_convex_hull(&shape),
-    );
-    // Yellow vial
-    let shape = vec![
-        [-5.0, 20.0],
-        [-3.0, -21.0],
-        [2.0, -23.5],
-        [5.5, -18.5],
-        [5.5, 23.0],
-    ];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        12,
-        ItemType::YellowVial,
-        position + Vec2::new(-1., 7.),
-        make_convex_hull(&shape),
-    );
-    // Blue vial
-    let shape = vec![
-        [-6.0, 22.5],
-        [-5.5, -22.0],
-        [-3.0, -25.0],
-        [2.0, -24.5],
-        [5.0, -18.0],
-        [4.0, 24.0],
-    ];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        13,
-        ItemType::BlueVial,
-        position + Vec2::new(19., 7.),
-        make_convex_hull(&shape),
-    );
-}
-
-pub fn cubes(commands: &mut Commands, atlas: Handle<TextureAtlas>, position: Vec2) {
-    let shape = vec![[-6.0, 6.0], [-6.5, -7.5], [7.0, -6.0], [4.0, 7.5]];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        14 + 0,
-        ItemType::Cube,
-        position + Vec2::new(0., 32.),
-        make_convex_hull(&shape),
-    );
-    let shape = vec![[-7.5, 4.5], [4.5, 8.0], [6.0, -7.5], [-5.0, -8.0]];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        14 + 1,
-        ItemType::Cube,
-        position + Vec2::new(-8., 16.),
-        make_convex_hull(&shape),
-    );
-    let shape = vec![[6.0, 8.0], [-7.5, 7.5], [-5.5, -7.5], [6.0, -7.5]];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        14 + 2,
-        ItemType::Cube,
-        position + Vec2::new(8., 16.),
-        make_convex_hull(&shape),
-    );
-    let shape = vec![[-8.0, 4.5], [6.0, 9.0], [8.0, -7.5], [-4.5, -9.5]];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        14 + 3,
-        ItemType::Cube,
-        position + Vec2::new(-16., 0.),
-        make_convex_hull(&shape),
-    );
-    let shape = vec![[-7.5, 7.5], [7.5, 9.0], [7.5, -9.5], [-6.0, -8.0]];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        14 + 4,
-        ItemType::Cube,
-        position + Vec2::new(0., 0.),
-        make_convex_hull(&shape),
-    );
-    let shape = vec![[7.0, 9.0], [-7.0, 8.5], [-5.5, -11.0], [7.0, -10.5]];
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        14 + 5,
-        ItemType::Cube,
-        position + Vec2::new(16., 0.),
-        make_convex_hull(&shape),
-    );
-}
-
-pub fn golden_nuggets(commands: &mut Commands, atlas: Handle<TextureAtlas>, position: Vec2) {
-    let shape = ColliderShape::round_cuboid(5., 5., 2.);
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        20 + 0,
-        ItemType::Gold,
-        position + Vec2::new(0., 32.),
-        shape.clone(),
-    );
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        20 + 1,
-        ItemType::Gold,
-        position + Vec2::new(-7.5, 16.),
-        shape.clone(),
-    );
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        20 + 2,
-        ItemType::Gold,
-        position + Vec2::new(7.5, 16.),
-        shape.clone(),
-    );
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        20 + 3,
-        ItemType::Gold,
-        position + Vec2::new(-15., 0.),
-        shape.clone(),
-    );
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        20 + 4,
-        ItemType::Gold,
-        position + Vec2::new(0., 0.),
-        shape.clone(),
-    );
-    spawn_from_atlas(
-        commands,
-        atlas.clone(),
-        20 + 5,
-        ItemType::Gold,
-        position + Vec2::new(15., 0.),
-        shape.clone(),
-    );
+impl SpawnItemBundleExt for Commands<'_> {
+    fn spawn_item_bundle(&mut self, bundle: Handle<ItemBundle>, position: Vec2) -> &mut Self {
+        self.add(SpawnItemBundle { bundle, position });
+        self
+    }
 }
