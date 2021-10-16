@@ -37,20 +37,16 @@ fn sprite_rect_vec_ser<S: serde::Serializer>(
     vec: &Vec<sprite::Rect>,
     serializer: S,
 ) -> Result<S::Ok, S::Error> {
-    // First convert the vector into a Vec<LocalColor>.
     let vec2: Vec<SpriteRect> = vec.iter().cloned().map(Into::into).collect();
 
-    // Instead of serializing Vec<ExternalCrateColor>, we serialize Vec<LocalColor>.
     vec2.serialize(serializer)
 }
 
 fn sprite_rect_vec_deser<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Vec<sprite::Rect>, D::Error> {
-    // Deserialize as if it was a Vec<LocalColor>.
     let vec: Vec<SpriteRect> = serde::Deserialize::deserialize(deserializer)?;
 
-    // Convert it into an Vec<ExternalCrateColor>
     Ok(vec.into_iter().map(Into::into).collect())
 }
 
@@ -96,7 +92,8 @@ impl AssetLoader for TextureAtlasLoader {
         Box::pin(async move {
             let atlas: TextureAtlasFile = ron::de::from_bytes(bytes)?;
 
-            let texture: Handle<Texture> = Handle::weak(AssetPath::from(atlas.src).get_id().into());
+            let texture: Handle<Texture> =
+                load_context.get_handle(AssetPath::from(atlas.src).get_id());
 
             let mut asset = TextureAtlas::new_empty(texture, atlas.size);
             for rect in atlas.textures {

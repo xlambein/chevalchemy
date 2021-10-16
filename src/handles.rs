@@ -18,37 +18,18 @@ pub struct Handles {
 impl FromWorld for Handles {
     fn from_world(world: &mut bevy::prelude::World) -> Self {
         let asset_server = world.get_resource::<AssetServer>().unwrap();
-        let mut texture_atlases = unsafe {
-            world
-                .get_resource_unchecked_mut::<Assets<TextureAtlas>>()
-                .unwrap()
-        };
         let mut color_materials = unsafe {
             world
                 .get_resource_unchecked_mut::<Assets<ColorMaterial>>()
                 .unwrap()
         };
 
-        // asset_server.add_loader(crate::texture_atlas::TextureAtlasLoader);
-        // TODO replace this with the atlas loader when it actually works
-        let controls_atlas = texture_atlases.add(
-            TextureAtlasFile::from_file("assets/controls.atlas")
-                .unwrap()
-                .into_asset(&asset_server),
-        );
-        // let controls_atlas = asset_server.load("controls.atlas");
-        let items_atlas = texture_atlases.add(
-            TextureAtlasFile::from_file("assets/items.atlas")
-                .unwrap()
-                .into_asset(&asset_server),
-        );
-        // let items_atlas = asset_server.load("items.atlas");
-        let smoke_atlas = texture_atlases.add(
-            TextureAtlasFile::from_file("assets/smoke.atlas")
-                .unwrap()
-                .into_asset(&asset_server),
-        );
-        // let smoke_atlas = asset_server.load("smoke.atlas");
+        asset_server.add_loader(crate::texture_atlas::TextureAtlasLoader);
+        let controls_atlas = asset_server.load("controls.atlas");
+        let items_atlas = asset_server.load("items.atlas");
+        let smoke_atlas = asset_server.load("smoke.atlas");
+
+        asset_server.load_folder("").unwrap();
 
         Handles {
             bg_material: color_materials.add(asset_server.load("main.png").into()),
