@@ -1,0 +1,70 @@
+[
+    (
+        label: "level1",
+        recipe: ["cube", "bone", "cube"],
+        bundles: [
+            ((96., 44.5), "bundles.bundles#bone1"),
+            ((96., 64.5), "bundles.bundles#bone2"),
+            ((-150., -25.), "bundles.bundles#cubes"),
+            ((-95., 118.), "bundles.bundles#eyed_vial"),
+            ((-160., 115.), "bundles.bundles#yorick"),
+        ]
+    ),
+    (
+        label: "level2",
+        recipe: ["gold_nugget", "eyed_vial", "bone"],
+        bundles: [
+            ((90., -10.), "bundles.bundles#eyed_vial"),
+            ((100., 100.), "bundles.bundles#bone1"),
+            ((100., 125.), "bundles.bundles#bone2"),
+            ((155., 52.), "bundles.bundles#mug"),
+            ((-100., -26.), "bundles.bundles#cubes"),
+            ((-100., 46.), "bundles.bundles#yorick"),
+            ((-159., 35.), "bundles.bundles#golden_nuggets"),
+        ]
+    ),
+    (
+        label: "level3",
+        recipe: ["eyed_vial", "radioactive_vial", "bone", "cube"],
+        bundles: [
+            ((-94., 55.), "bundles.bundles#eyed_vial"),
+            ((-150., -5.), "bundles.bundles#radioactive_vial"),
+            ((100., 100.), "bundles.bundles#bone1"),
+            ((100., 125.), "bundles.bundles#bone2"),
+            ((155., 52.), "bundles.bundles#mug"),
+            ((-100., -26.), "bundles.bundles#cubes"),
+            ((-135., 112.), "bundles.bundles#yorick"),
+            ((93., 35.), "bundles.bundles#golden_nuggets"),
+        ]
+    ),
+    (
+        label: "level4",
+        recipe: ["eyed_vial", "mug", "yellow_vial", "bone"],
+        bundles: [
+            ((100., -10.), "bundles.bundles#eyed_vial"),
+            ((-100., 0.), "bundles.bundles#radioactive_vial"),
+            ((100., 100.), "bundles.bundles#bone1"),
+            ((100., 125.), "bundles.bundles#bone2"),
+            ((160., 120.), "bundles.bundles#mug"),
+            ((-166., 55.), "bundles.bundles#yorick"),
+            ((-100., 60.), "bundles.bundles#vial_stand"),
+            ((-150., -21.), "bundles.bundles#cubes"),
+            ((-100., 100.), "bundles.bundles#golden_nuggets"),
+        ]
+    ),
+    (
+        label: "level5",
+        recipe: ["red_vial", "gold_nugget", "eyed_vial", "blue_vial"],
+        bundles: [
+            ((-159., 119.), "bundles.bundles#eyed_vial"),
+            ((163., -8.), "bundles.bundles#radioactive_vial"),
+            ((-153., 50.), "bundles.bundles#mug"),
+            ((-156., -13.), "bundles.bundles#yorick"),
+            ((100., 55.), "bundles.bundles#vial_stand"),
+            ((-100., -22.), "bundles.bundles#golden_nuggets"),
+            ((-100., 100.), "bundles.bundles#bone1"),
+            ((-100., 125.), "bundles.bundles#bone2"),
+            ((111., 105.), "bundles.bundles#cubes"),
+        ]
+    ),
+]

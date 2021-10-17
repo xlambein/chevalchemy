@@ -1,3 +1,4 @@
+use crate::levels::Level;
 use bevy::{app::AppExit, prelude::*};
 use bevy_rapier2d::{na, prelude::*};
 use rand::prelude::*;
@@ -10,8 +11,8 @@ mod texture_atlas;
 #[cfg(target_arch = "wasm32")]
 mod wasm;
 
-use handles::{Bundles, Handles};
-use levels::*;
+use handles::Handles;
+use levels::SpawnLevelExt;
 
 #[wasm_bindgen]
 pub fn run() {
@@ -44,13 +45,12 @@ pub fn run() {
     .add_event::<NextLevelEvent>()
     .add_event::<ItemInCauldronEvent>()
     .init_resource::<Handles>()
-    .init_resource::<Bundles>()
     .insert_resource(MousePositionWorld::default())
     .add_startup_system(setup.system().label("setup"))
     .add_startup_system(setup_base.system().after("setup"))
     // Main menu
     .add_state(AppState::InGame)
-    .insert_resource(CurrentLevel::new())
+    .insert_resource(CurrentLevel::default())
     .insert_resource(CurrentRecipe::default())
     // .add_system_set(SystemSet::on_enter(AppState::MainMenu).with_system(setup_base.system()))
     // .add_system_set_to_stage(
@@ -88,63 +88,11 @@ enum AppState {
     InGame,
 }
 
-const N_LEVELS: u32 = 5;
+struct CurrentLevel(usize);
 
-struct CurrentLevel(u32);
-
-impl CurrentLevel {
-    fn new() -> Self {
+impl Default for CurrentLevel {
+    fn default() -> Self {
         Self(0)
-    }
-
-    fn next_level(&mut self) -> bool {
-        if self.0 < N_LEVELS - 1 {
-            self.0 += 1;
-            true
-        } else {
-            false
-        }
-    }
-
-    fn recipe(&self) -> Vec<ItemType> {
-        match self.0 {
-            0 => vec!["cube".to_owned(), "bone".to_owned(), "cube".to_owned()],
-            1 => vec![
-                "gold_nugget".to_owned(),
-                "eyed_vial".to_owned(),
-                "bone".to_owned(),
-            ],
-            2 => vec![
-                "eyed_vial".to_owned(),
-                "radioactive_vial".to_owned(),
-                "bone".to_owned(),
-                "cube".to_owned(),
-            ],
-            3 => vec![
-                "eyed_vial".to_owned(),
-                "mug".to_owned(),
-                "yellow_vial".to_owned(),
-                "bone".to_owned(),
-            ],
-            4 => vec![
-                "red_vial".to_owned(),
-                "gold_nugget".to_owned(),
-                "eyed_vial".to_owned(),
-                "blue_vial".to_owned(),
-            ],
-            _ => unreachable!(),
-        }
-    }
-
-    fn spawn(&self, commands: &mut Commands, bundles: &Res<Bundles>) {
-        match self.0 {
-            0 => spawn_level0(commands, bundles),
-            1 => spawn_level1(commands, bundles),
-            2 => spawn_level2(commands, bundles),
-            3 => spawn_level3(commands, bundles),
-            4 => spawn_level4(commands, bundles),
-            _ => unreachable!(),
-        }
     }
 }
 
@@ -672,13 +620,16 @@ fn reset_level_events(
     mut update_recipe_events: EventWriter<UpdateRecipeEvent>,
 
     mut commands: Commands,
-    bundles: Res<Bundles>,
+    levels: Res<Assets<Level>>,
+    handles: Res<Handles>,
     items: Query<Entity, With<Item>>,
 ) {
     if let Some(_) = reset_level_events.iter().last() {
-        *current_recipe = CurrentRecipe::new(current_level.recipe());
+        let level_handle = handles.levels[current_level.0].clone();
+        let level = levels.get(level_handle.clone_weak()).unwrap();
+        *current_recipe = CurrentRecipe::new(level.recipe.clone());
         items.for_each(|e| commands.entity(e).despawn_recursive());
-        current_level.spawn(&mut commands, &bundles);
+        commands.spawn_level(level_handle);
         update_recipe_events.send(UpdateRecipeEvent);
     }
 }
@@ -687,9 +638,11 @@ fn next_level_events(
     mut next_level_events: EventReader<NextLevelEvent>,
     mut reset_level_events: EventWriter<ResetLevelEvent>,
     mut current_level: ResMut<CurrentLevel>,
+    handles: Res<Handles>,
 ) {
     if let Some(_) = next_level_events.iter().last() {
-        if current_level.next_level() {
+        if current_level.0 < handles.levels.len() - 1 {
+            current_level.0 += 1;
             // Reset level if there's a next one
             reset_level_events.send(ResetLevelEvent);
         } else {
