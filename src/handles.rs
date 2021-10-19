@@ -1,16 +1,18 @@
 use bevy::{
     asset::{AssetServer, Assets, Handle},
     ecs::world::FromWorld,
+    render::texture::Texture,
     sprite::{ColorMaterial, TextureAtlas},
 };
 
 use crate::{
-    items::{Item, ItemBundle, ItemBundleLoader, ItemLoader},
-    levels::{Level, LevelLoader},
+    items::{Item, ItemBundle},
+    levels::Level,
 };
 
 pub struct Handles {
     pub bg_material: Handle<ColorMaterial>,
+    pub leg_texture: Handle<Texture>,
     pub leg_material: Handle<ColorMaterial>,
     pub cauldron_material: Handle<ColorMaterial>,
     pub controls_atlas: Handle<TextureAtlas>,
@@ -29,11 +31,6 @@ impl FromWorld for Handles {
                 .get_resource_unchecked_mut::<Assets<ColorMaterial>>()
                 .unwrap()
         };
-
-        asset_server.add_loader(crate::texture_atlas::TextureAtlasLoader);
-        asset_server.add_loader(ItemLoader);
-        asset_server.add_loader(ItemBundleLoader);
-        asset_server.add_loader(LevelLoader);
 
         let controls_atlas = asset_server.load("controls.atlas");
         let items_atlas = asset_server.load("items.atlas");
@@ -54,6 +51,7 @@ impl FromWorld for Handles {
 
         Handles {
             bg_material: color_materials.add(asset_server.load("main.png").into()),
+            leg_texture: asset_server.load("leg.png"),
             leg_material: color_materials.add(asset_server.load("leg.png").into()),
             cauldron_material: color_materials.add(asset_server.load("cauldron.png").into()),
             controls_atlas: controls_atlas,

@@ -10,7 +10,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 # bevy = { version = "0.5.0" }
 # bevy = { version = "0.5.0", features = ["dynamic"] }
-bevy_rapier2d = "0.11.0"
+bevy_rapier2d = { version = "0.11.0", features = ["serde-serialize"] }
 rand = "0.8.4"
 getrandom = { version = "0.2", features = ["js"] }
 wasm-bindgen = "0.2"
@@ -18,6 +18,7 @@ console_error_panic_hook = "0.1"
 serde = { version = "1.0", features = ["derive"] }
 ron = "0.6"
 anyhow = "1"
+bevy_egui = "0.7"
 
 [profile.dev.package.bevy_rapier2d]
 opt-level = 3

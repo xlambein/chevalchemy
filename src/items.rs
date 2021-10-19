@@ -66,10 +66,10 @@ struct ItemFile {
 #[derive(Debug, Clone, TypeUuid)]
 #[uuid = "3226f39f-1918-421a-b3a0-e0b2ad20932e"]
 pub struct Item {
-    label: String,
-    ty: String,
-    texture_atlas: Handle<TextureAtlas>,
-    texture_index: u32,
+    pub label: String,
+    pub ty: String,
+    pub texture_atlas: Handle<TextureAtlas>,
+    pub texture_index: u32,
     colliders: Vec<(Vec2, Shape)>,
 }
 
@@ -98,7 +98,7 @@ impl Item {
                 ..Default::default()
             })
             .insert(RigidBodyPositionSync::Discrete)
-            .insert(crate::Item(self.ty.clone()));
+            .insert(crate::IsItem(self.ty.clone()));
     }
 }
 
@@ -111,8 +111,8 @@ struct ItemBundleFile {
 #[derive(Debug, Clone, TypeUuid)]
 #[uuid = "6c68c7cc-59f1-4686-927b-8ebb53f06df1"]
 pub struct ItemBundle {
-    label: String,
-    items: Vec<(Vec2, Handle<Item>)>,
+    pub label: String,
+    pub items: Vec<(Vec2, Handle<Item>)>,
 }
 
 impl ItemBundle {
@@ -261,7 +261,7 @@ impl Command for SpawnItemBundle {
                     ..Default::default()
                 })
                 .insert(RigidBodyPositionSync::Discrete)
-                .insert(crate::Item(item.ty.clone()));
+                .insert(crate::IsItem(item.ty.clone()));
         }
 
         command_queue.apply(world);

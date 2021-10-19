@@ -1,9 +1,9 @@
-use crate::levels::Level;
 use bevy::{app::AppExit, prelude::*};
 use bevy_rapier2d::{na, prelude::*};
 use rand::prelude::*;
 use wasm_bindgen::prelude::*;
 
+mod editor;
 mod handles;
 mod items;
 mod levels;
@@ -11,8 +11,9 @@ mod texture_atlas;
 #[cfg(target_arch = "wasm32")]
 mod wasm;
 
+use editor::EditorPlugin;
 use handles::Handles;
-use levels::SpawnLevelExt;
+use levels::{Level, SpawnLevelExt};
 
 #[wasm_bindgen]
 pub fn run() {
@@ -33,13 +34,18 @@ pub fn run() {
     })
     .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
     .add_plugin(RapierRenderPlugin)
+    .add_plugin(EditorPlugin)
     .add_system(bevy::input::system::exit_on_esc_system.system())
     // Assets
     .add_asset::<items::Item>()
     .add_asset::<items::ItemBundle>()
     .add_asset::<levels::Level>()
+    // Asset loaders
+    .init_asset_loader::<texture_atlas::TextureAtlasLoader>()
+    .init_asset_loader::<items::ItemLoader>()
+    .init_asset_loader::<items::ItemBundleLoader>()
+    .init_asset_loader::<levels::LevelLoader>()
     // Events
-    .add_event::<StartLevelEvent>()
     .add_event::<UpdateRecipeEvent>()
     .add_event::<ResetLevelEvent>()
     .add_event::<NextLevelEvent>()
@@ -143,13 +149,12 @@ fn item_type_to_atlas_index(item_type: &str) -> u32 {
     }
 }
 
-struct StartLevelEvent(u32);
 struct UpdateRecipeEvent;
 struct ResetLevelEvent;
 struct NextLevelEvent;
 struct ItemInCauldronEvent(ItemType);
 
-struct Item(ItemType);
+struct IsItem(ItemType);
 struct Mouse;
 struct MainCamera;
 struct CauldronSensor;
@@ -378,7 +383,6 @@ fn setup_base(mut commands: Commands, handles: Res<Handles>) {
             ..Default::default()
         })
         .insert_bundle(ColliderBundle {
-            // shape: ColliderShape::ball(10.0),
             shape: ColliderShape::convex_polyline(
                 hoof_shape
                     .iter()
@@ -393,9 +397,7 @@ fn setup_base(mut commands: Commands, handles: Res<Handles>) {
         .insert(Mouse)
         .with_children(|parent| {
             parent.spawn_bundle(SpriteBundle {
-                // sprite: Sprite::new(Vec2::new(345. * 2., 122. * 2.)),
                 transform: Transform::from_xyz(200. - 19., -162. + 19., 500.),
-                // transform: Transform::from_xyz(0.0, 0.0, 500.),
                 material: handles.leg_material.clone(),
                 ..Default::default()
             });
@@ -501,7 +503,7 @@ fn probe(
 fn cauldron_detector(
     mut commands: Commands,
     cauldron: Query<Entity, With<CauldronSensor>>,
-    items: Query<&Item>,
+    items: Query<&IsItem>,
     narrow_phase: Res<NarrowPhase>,
     mut item_in_cauldron_events: EventWriter<ItemInCauldronEvent>,
 ) {
@@ -622,7 +624,7 @@ fn reset_level_events(
     mut commands: Commands,
     levels: Res<Assets<Level>>,
     handles: Res<Handles>,
-    items: Query<Entity, With<Item>>,
+    items: Query<Entity, With<IsItem>>,
 ) {
     if let Some(_) = reset_level_events.iter().last() {
         let level_handle = handles.levels[current_level.0].clone();
