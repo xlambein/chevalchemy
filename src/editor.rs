@@ -1,9 +1,11 @@
-use crate::MousePositionWorld;
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContext, EguiPlugin};
 use std::collections::HashMap;
 
-use crate::items::{Item, ItemBundle, SpawnItemBundleExt};
+use crate::{
+    items::{Item, ItemBundle, SpawnItemBundleExt},
+    mouse_position_world::MousePositionWorld,
+};
 
 pub struct EditorPlugin;
 

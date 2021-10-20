@@ -7,6 +7,7 @@ mod editor;
 mod handles;
 mod items;
 mod levels;
+mod mouse_position_world;
 mod texture_atlas;
 #[cfg(target_arch = "wasm32")]
 mod wasm;
@@ -14,6 +15,7 @@ mod wasm;
 use editor::EditorPlugin;
 use handles::Handles;
 use levels::{Level, SpawnLevelExt};
+use mouse_position_world::{MousePositionWorld, MousePositionWorldPlugin};
 
 #[wasm_bindgen]
 pub fn run() {
@@ -34,6 +36,7 @@ pub fn run() {
     })
     .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
     .add_plugin(RapierRenderPlugin)
+    .add_plugin(MousePositionWorldPlugin)
     .add_plugin(EditorPlugin)
     .add_system(bevy::input::system::exit_on_esc_system.system())
     // Assets
@@ -50,8 +53,9 @@ pub fn run() {
     .add_event::<ResetLevelEvent>()
     .add_event::<NextLevelEvent>()
     .add_event::<ItemInCauldronEvent>()
+    // Resources
     .init_resource::<Handles>()
-    .insert_resource(MousePositionWorld::default())
+    // Startup systems
     .add_startup_system(setup.system().label("setup"))
     .add_startup_system(setup_base.system().after("setup"))
     // Main menu
@@ -68,7 +72,7 @@ pub fn run() {
     //     CoreStage::PreUpdate,
     //     SystemSet::on_update(AppState::InGame).with_system(mouse_position.system()),
     // )
-    .add_system(mouse_position.system())
+    .add_system(hoof.system())
     .add_system(probe.system())
     .add_system(cauldron_detector.system())
     .add_system(despawn_when_oob.system())
@@ -159,9 +163,6 @@ struct Mouse;
 struct MainCamera;
 struct CauldronSensor;
 struct RecipeDisplay;
-
-#[derive(Default)]
-struct MousePositionWorld(Vec2);
 
 fn spawn_cuboid(commands: &mut Commands, pos: Vec2, size: Vec2) {
     commands
@@ -449,31 +450,12 @@ fn start_level(commands: &mut Commands, handles: &Res<Handles>) {
         });
 }
 
-fn mouse_position(
-    wnds: Res<Windows>,
-    mut mouse_position_world: ResMut<MousePositionWorld>,
-    mut q: QuerySet<(
-        Query<&Transform, With<MainCamera>>,
-        Query<&mut RigidBodyPosition, With<Mouse>>,
-    )>,
+fn hoof(
+    mouse_position_world: Res<MousePositionWorld>,
+    mut hoof: Query<&mut RigidBodyPosition, With<Mouse>>,
 ) {
-    let wnd = wnds.get_primary().unwrap();
-
-    if let Some(pos) = wnd.cursor_position() {
-        let size = Vec2::new(wnd.width() as f32, wnd.height() as f32);
-
-        let p = pos - size / 2.0;
-
-        let camera_transform = q.q0().single().unwrap();
-
-        let pos_wld = camera_transform.compute_matrix() * p.extend(0.0).extend(1.0);
-        let pos_wld = pos_wld.truncate();
-
-        mouse_position_world.0 = Vec2::new(pos_wld.x, pos_wld.y);
-
-        let mut mouse = q.q1_mut().single_mut().unwrap();
-        mouse.next_position.translation.vector = na::Vector2::new(pos_wld.x, pos_wld.y);
-    }
+    let mut hoof = hoof.single_mut().unwrap();
+    hoof.next_position.translation.vector = mouse_position_world.0.into();
 }
 
 fn probe(
